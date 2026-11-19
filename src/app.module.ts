@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
+import { AlertsModule } from './alerts/alerts.module';
 import { AuthModule } from './auth/auth.module';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
@@ -24,6 +25,7 @@ import { VoiceModule } from './voice/voice.module';
     SettingsModule,
     KickModule,
     TtsModule,
+    AlertsModule,
     VoiceModule,
   ],
   controllers: [AppController],
