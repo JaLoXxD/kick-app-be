@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { PrismaModule } from './prisma/prisma.module';
     EventEmitterModule.forRoot(),
     PrismaModule,
     AuthModule,
+    SettingsModule,
   ],
   controllers: [AppController],
 })
