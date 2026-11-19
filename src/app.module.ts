@@ -9,6 +9,7 @@ import { KickModule } from './kick/kick.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SettingsModule } from './settings/settings.module';
 import { TtsModule } from './tts/tts.module';
+import { VoiceModule } from './voice/voice.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { TtsModule } from './tts/tts.module';
     SettingsModule,
     KickModule,
     TtsModule,
+    VoiceModule,
   ],
   controllers: [AppController],
 })
