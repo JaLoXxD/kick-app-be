@@ -7,6 +7,7 @@ import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
 import { SettingsModule } from './settings/settings.module';
+import { TtsModule } from './tts/tts.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { SettingsModule } from './settings/settings.module';
     PrismaModule,
     AuthModule,
     SettingsModule,
+    TtsModule,
   ],
   controllers: [AppController],
 })
