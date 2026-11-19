@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { GoalsModule } from './goals/goals.module';
+import { OverlaysModule } from './overlays/overlays.module';
 import { KickModule } from './kick/kick.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SettingsModule } from './settings/settings.module';
@@ -28,6 +29,7 @@ import { VoiceModule } from './voice/voice.module';
     TtsModule,
     AlertsModule,
     GoalsModule,
+    OverlaysModule,
     VoiceModule,
   ],
   controllers: [AppController],
