@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
+import { KickModule } from './kick/kick.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SettingsModule } from './settings/settings.module';
 import { TtsModule } from './tts/tts.module';
@@ -20,6 +21,7 @@ import { TtsModule } from './tts/tts.module';
     PrismaModule,
     AuthModule,
     SettingsModule,
+    KickModule,
     TtsModule,
   ],
   controllers: [AppController],
