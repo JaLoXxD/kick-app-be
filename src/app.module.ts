@@ -11,6 +11,7 @@ import { OverlaysModule } from './overlays/overlays.module';
 import { KickModule } from './kick/kick.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SettingsModule } from './settings/settings.module';
+import { SpotifyModule } from './spotify/spotify.module';
 import { TtsModule } from './tts/tts.module';
 import { VoiceModule } from './voice/voice.module';
 
@@ -30,6 +31,7 @@ import { VoiceModule } from './voice/voice.module';
     AlertsModule,
     GoalsModule,
     OverlaysModule,
+    SpotifyModule,
     VoiceModule,
   ],
   controllers: [AppController],
