@@ -4,6 +4,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AlertsModule } from './alerts/alerts.module';
 import { AuthModule } from './auth/auth.module';
+import { ChatModule } from './chat/chat.module';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { GoalsModule } from './goals/goals.module';
@@ -35,6 +36,7 @@ import { VoiceModule } from './voice/voice.module';
     SpotifyModule,
     PointsModule,
     VoiceModule,
+    ChatModule,
   ],
   controllers: [AppController],
 })
