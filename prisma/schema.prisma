@@ -1,0 +1,411 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Catálogo de voces: cada una apunta a una voz de la biblioteca de Fish Audio.
+model VoiceProfile {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  /// ID de la voz en Fish Audio (el código al final de la URL fish.audio/es/app/m/<id>)
+  fishVoiceId String
+  /// Velocidad de habla (prosody.speed de Fish), 0.5-2.0
+  speed       Float    @default(1)
+  /// Tono en semitonos (-6 a 6). Se aplica en la reproducción; Fish no tiene parámetro de tono.
+  pitch       Int      @default(0)
+  /// Si es la voz usada cuando un usuario no tiene una asignada
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userMappings UserVoiceMapping[]
+
+  @@map("voice_profiles")
+}
+
+/// Asignación fija de una voz a un usuario específico de Kick.
+model UserVoiceMapping {
+  id             String   @id @default(uuid())
+  /// username de Kick (en minúsculas)
+  kickUsername   String   @unique
+  voiceProfileId String
+  /// Volumen propio del usuario (0-100), se multiplica por el volumen global.
+  volume         Int      @default(100)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  voiceProfile VoiceProfile @relation(fields: [voiceProfileId], references: [id], onDelete: Cascade)
+
+  @@map("user_voice_mappings")
+}
+
+/// Tokens OAuth del streamer (una sola fila, id = "streamer").
+model KickAuth {
+  id           String   @id
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  scope        String
+  updatedAt    DateTime @updatedAt
+
+  @@map("kick_auth")
+}
+
+/// Ajustes de lectura del chat y control de gasto (una sola fila, id = "app").
+model AppSettings {
+  id                  String   @id
+  /// "all" lee todo el chat; "command" solo mensajes que empiezan con `command`
+  readMode            String
+  command             String
+  maxChars            Int
+  userCooldownSeconds Int
+  dailyCharCap        Int
+  /// Volumen de reproducción en el overlay, 0-100
+  volume              Int      @default(100)
+  /// Antispam: máximo de letras iguales seguidas ("mmmmmm"); 0 = sin filtro
+  maxRepeatedChars    Int      @default(3)
+  /// Qué hacer al pasarse: "shorten" acorta la repetición, "ignore" descarta el mensaje
+  repeatAction        String   @default("shorten")
+  /// Iguala el volumen de todas las voces (se mide en el overlay y se ajusta la ganancia)
+  normalizeVolume     Boolean  @default(true)
+  updatedAt           DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+/// Overlay de texto con "el último …" (hoy solo "follower"). Una fila por tipo.
+model LastEventOverlay {
+  type          String   @id
+  /// Último usuario recibido; vacío hasta que llegue el primero
+  lastUsername  String   @default("")
+  textTemplate  String
+  fontFamily    String   @default("Montserrat")
+  fontSize      Int      @default(36)
+  textColor     String   @default("#ffffff")
+  /// Color de {usuario}
+  variableColor String   @default("#53fc18")
+  outlineColor  String   @default("#000000")
+  outlineWidth  Int      @default(3)
+  updatedAt     DateTime @updatedAt
+
+  @@map("last_event_overlays")
+}
+
+/// Contador de la sesión (lo ganado desde el último reinicio): seguidores, subs y KICKs.
+model SessionCounter {
+  id            String   @id
+  followers     Int      @default(0)
+  subs          Int      @default(0)
+  giftedSubs    Int      @default(0)
+  kicks         Int      @default(0)
+  startedAt     DateTime @default(now())
+  /// Variables: {seguidores} {subs} {regaladas} {kicks}
+  textTemplate  String   @default("Hoy: +{seguidores} seguidores · {subs} subs · {kicks} KICKs")
+  fontFamily    String   @default("Montserrat")
+  fontSize      Int      @default(32)
+  textColor     String   @default("#ffffff")
+  variableColor String   @default("#53fc18")
+  outlineColor  String   @default("#000000")
+  outlineWidth  Int      @default(3)
+  updatedAt     DateTime @updatedAt
+
+  @@map("session_counters")
+}
+
+/// Cada propina de KICKs recibida, para calcular el top de donadores por periodo.
+model KickDonation {
+  id        String   @id @default(uuid())
+  username  String
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("kick_donations")
+}
+
+/// Configuración del overlay "Top donadores".
+model DonorBoard {
+  id            String   @id
+  title         String   @default("Top donadores")
+  /// Variables: {posicion} {usuario} {cantidad}
+  entryTemplate String   @default("{posicion}. {usuario} — {cantidad} KICKs")
+  limit         Int      @default(5)
+  /// "all" | "month" | "week" | "session"
+  period        String   @default("all")
+  fontFamily    String   @default("Montserrat")
+  fontSize      Int      @default(30)
+  textColor     String   @default("#ffffff")
+  variableColor String   @default("#53fc18")
+  outlineColor  String   @default("#000000")
+  outlineWidth  Int      @default(3)
+  updatedAt     DateTime @updatedAt
+
+  @@map("donor_boards")
+}
+
+/// Overlay "Rotador": alterna entre varios overlays en un mismo cuadro.
+model RotatorConfig {
+  id              String   @id
+  /// Orden de los paneles: "follower" | "subscriber" | "donors" | "session"
+  items           String[] @default(["follower", "subscriber", "donors", "session"])
+  intervalSeconds Int      @default(8)
+  updatedAt       DateTime @updatedAt
+
+  @@map("rotator_configs")
+}
+
+/// Palabra o frase prohibida del filtro del chat. `builtin` marca las que vienen de la lista base.
+model BlockedWord {
+  id        String   @id @default(uuid())
+  /// Como la escribió el usuario (minúsculas); el filtro la normaliza al comparar
+  word      String   @unique
+  /// "exact" = solo la palabra completa; "contains" = también dentro de otras palabras y partida en varias ("mar" + "con")
+  matchMode String   @default("exact")
+  enabled   Boolean  @default(true)
+  builtin   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("blocked_words")
+}
+
+/// Configuración de cada tipo de alerta ("follow", "kicks", "subscription"). Una fila por tipo.
+model AlertConfig {
+  eventType       String   @id
+  enabled         Boolean  @default(false)
+  /// Texto en pantalla; {usuario} se reemplaza por el nombre del seguidor
+  textTemplate    String
+  ttsEnabled      Boolean  @default(true)
+  /// Mensaje que lee el TTS; {usuario} se reemplaza igual
+  ttsTemplate     String
+  /// Voz del TTS; null = voz por defecto
+  voiceProfileId  String?
+  /// Nombre de archivo (en ALERTS_DIR) de la imagen o GIF
+  imageFile       String?
+  /// Nombre de archivo (en ALERTS_DIR) del audio; suena antes del TTS
+  audioFile       String?
+  durationSeconds Int      @default(6)
+  /// Solo para "kicks": cantidad mínima de KICKs para que se muestre la alerta
+  minAmount       Int      @default(1)
+  fontFamily      String   @default("Montserrat")
+  fontSize        Int      @default(48)
+  textColor       String   @default("#ffffff")
+  /// Color de las variables del texto ({usuario}, {cantidad}) para que resalten
+  variableColor   String   @default("#ffffff")
+  outlineColor    String   @default("#000000")
+  /// Grosor del contorno en px; 0 = sin contorno
+  outlineWidth    Int      @default(3)
+  updatedAt       DateTime @updatedAt
+
+  @@map("alert_configs")
+}
+
+/// Metas que se muestran en OBS (barra de progreso o solo números). Una fila por meta: "follow", "kicks" y "subs".
+model GoalConfig {
+  id           String   @id
+  /// Seguidores actuales: se fija a mano y cada `channel.followed` suma uno (la API de Kick no entrega el total)
+  currentCount Int      @default(0)
+  goalCount    Int      @default(100)
+  /// Texto de la barra; {actual}, {meta} y {porcentaje} se reemplazan
+  textTemplate String   @default("Meta de seguidores: {actual}/{meta}")
+  /// "bar" (barra de progreso) | "number" (solo el texto, sin barra)
+  displayStyle String   @default("bar")
+  /// Anima el relleno como un líquido (olas y salpicadura) al subir
+  liquid       Boolean  @default(true)
+  /// "above" (sobre la barra) | "inside" (dentro de la barra)
+  textPosition String   @default("above")
+  fontFamily   String   @default("Montserrat")
+  fontSize     Int      @default(28)
+  textColor    String   @default("#ffffff")
+  outlineColor String   @default("#000000")
+  outlineWidth Int      @default(2)
+  barWidth     Int      @default(600)
+  barHeight    Int      @default(36)
+  /// Radio de las esquinas en px
+  barRadius    Int      @default(18)
+  /// Relleno: degradado de barColor a barColor2 (iguales = color sólido)
+  barColor     String   @default("#53fc18")
+  barColor2    String   @default("#2bd9a0")
+  trackColor   String   @default("#0b2540")
+  borderColor  String   @default("#ffffff")
+  borderWidth  Int      @default(2)
+  updatedAt    DateTime @updatedAt
+
+  @@map("goal_configs")
+}
+
+/// Usuarios de Kick a los que no se les lee el chat en voz alta (spam). El texto sí sigue en el overlay.
+model MutedUser {
+  id           String   @id @default(uuid())
+  /// username normalizado (minúsculas, sin @, "_" como "-")
+  kickUsername String   @unique
+  createdAt    DateTime @default(now())
+
+  @@map("muted_users")
+}
+
+/// Sesión de Spotify del streamer (una sola fila, id = "streamer").
+model SpotifyAuth {
+  id           String   @id
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  scope        String
+  displayName  String?
+  /// "premium" | "free" | "open": solo premium permite encolar canciones.
+  product      String?
+  updatedAt    DateTime @updatedAt
+
+  @@map("spotify_auth")
+}
+
+/// Ajustes de las peticiones de canciones (una sola fila, id = "app").
+model SpotifyConfig {
+  id                   String   @id
+  enabled              Boolean  @default(false)
+  playCommand          String   @default("!play")
+  revokeCommand        String   @default("!revoke")
+  /// Cada usuario puede pedir 1 canción por esta ventana (minutos).
+  perUserWindowMinutes Int      @default(60)
+  /// Tiempo mínimo entre dos peticiones cualesquiera (minutos, 0 = sin mínimo).
+  minGapMinutes        Int      @default(0)
+  /// Máximo de peticiones esperando en la cola del bot.
+  maxQueueSize         Int      @default(20)
+  /// 0 = sin límite.
+  maxDurationSeconds   Int      @default(0)
+  blockExplicit        Boolean  @default(false)
+  /// Textos (canción o artista) que no se aceptan.
+  blockedTerms         String[] @default([])
+  /// Segundos antes de terminar la canción actual en que se pasa la siguiente a Spotify.
+  leadSeconds          Int      @default(30)
+  /// Responde en el chat de Kick (necesita el permiso chat:write).
+  replyInChat          Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
+
+  @@map("spotify_configs")
+}
+
+/// Cola propia de peticiones: Spotify no deja quitar canciones de su cola, así que se guardan aquí hasta que toca enviarlas.
+model SpotifyRequest {
+  id         String    @id @default(uuid())
+  username   String
+  trackUri   String
+  trackName  String
+  artists    String
+  durationMs Int
+  /// pending | sent | played | revoked | removed | failed
+  status     String    @default("pending")
+  createdAt  DateTime  @default(now())
+  sentAt     DateTime?
+
+  @@index([status, createdAt])
+  @@index([username, createdAt])
+  @@map("spotify_requests")
+}
+
+/// Ajustes del sistema de puntos y la ruleta (una sola fila, id = "app").
+model PointsConfig {
+  id                      String   @id
+  enabled                 Boolean  @default(false)
+  /// Nombre que se muestra en el chat ("puntos", "monedas"...).
+  pointsName              String   @default("puntos")
+  pointsCommand           String   @default("!puntos")
+  rouletteCommand         String   @default("!ruleta")
+  /// Puntos por mensaje del chat (0 = no se ganan hablando).
+  perMessage              Int      @default(5)
+  /// Segundos mínimos entre dos mensajes que sumen puntos al mismo usuario.
+  messageCooldownSeconds  Int      @default(60)
+  followBonus             Int      @default(100)
+  subBonus                Int      @default(500)
+  /// Por cada suscripción regalada (se le da a quien regala).
+  giftSubBonus            Int      @default(300)
+  /// Por cada KICK enviado.
+  perKick                 Int      @default(1)
+  rouletteEnabled         Boolean  @default(true)
+  minBet                  Int      @default(10)
+  maxBet                  Int      @default(1000)
+  rouletteCooldownSeconds Int      @default(30)
+  /// [{ label, multiplier, weight }]: el pago es apuesta × multiplicador.
+  outcomes                Json     @default("[{\"label\":\"Pierdes\",\"multiplier\":0,\"weight\":62},{\"label\":\"x2\",\"multiplier\":2,\"weight\":29},{\"label\":\"x3\",\"multiplier\":3,\"weight\":7},{\"label\":\"x10\",\"multiplier\":10,\"weight\":2}]")
+  replyInChat             Boolean  @default(true)
+  duelsEnabled            Boolean  @default(true)
+  duelCommand             String   @default("!duelo")
+  acceptCommand           String   @default("!aceptar")
+  declineCommand          String   @default("!rechazar")
+  duelMinBet              Int      @default(10)
+  duelMaxBet              Int      @default(1000)
+  /// Porcentaje del pozo (las dos apuestas) que no se paga al ganador; los puntos desaparecen.
+  duelFeePercent          Int      @default(0)
+  /// Segundos que tiene el retado para aceptar.
+  duelTimeoutSeconds      Int      @default(30)
+  /// Segundos de espera para que un mismo usuario lance otro reto.
+  duelCooldownSeconds     Int      @default(60)
+  updatedAt               DateTime @updatedAt
+
+  @@map("points_configs")
+}
+
+/// Saldo de puntos por usuario (username en minúsculas).
+model PointsBalance {
+  username    String   @id
+  displayName String
+  balance     Int      @default(0)
+  /// Total ganado por actividad (no cuenta apuestas ni ajustes manuales).
+  earned      Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@index([balance])
+  @@map("points_balances")
+}
+
+/// Movimientos que no son "mensaje del chat" (ruleta, bonos, ajustes del streamer).
+model PointsLog {
+  id        String   @id @default(uuid())
+  username  String
+  delta     Int
+  reason    String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([username, createdAt])
+  @@map("points_log")
+}
+
+/// Comandos del chat que cuestan puntos y reproducen TTS y/o un sonido en el overlay de alertas.
+model PointsCommand {
+  id                  String   @id @default(uuid())
+  /// Con "!" y en minúsculas, p. ej. "!afk"
+  name                String   @unique
+  enabled             Boolean  @default(true)
+  cost                Int      @default(0)
+  /// "all" | "followers" | "subscribers"
+  audience            String   @default("all")
+  ttsEnabled          Boolean  @default(false)
+  /// Texto que lee el TTS: {usuario}, {mensaje}, {costo}
+  ttsTemplate         String   @default("")
+  /// Voz del TTS; null = voz por defecto
+  voiceProfileId      String?
+  /// Nombre de archivo (en ALERTS_DIR) del sonido
+  audioFile           String?
+  /// Segundos que debe esperar el mismo usuario para repetirlo (0 = sin espera)
+  userCooldownSeconds Int      @default(60)
+  /// Segundos que debe esperar cualquiera para usarlo de nuevo (0 = sin espera)
+  globalCooldownSeconds Int    @default(0)
+  /// Respuesta del bot en el chat: {usuario}, {costo}, {saldo}; vacío = no responde
+  replyTemplate       String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("points_commands")
+}
+
+/// Usuarios que vimos seguir el canal (Kick no dice quién es seguidor): sirve para los comandos "solo seguidores".
+model KnownFollower {
+  username  String   @id
+  createdAt DateTime @default(now())
+
+  @@map("known_followers")
+}
