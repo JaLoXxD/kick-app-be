@@ -1,0 +1,17 @@
+# Se importa dentro del bloque de jhidalgo-dev.cloud (ver custom-list.caddy).
+# Todo lo que cuelga de /kick-tts/ va al backend si es de la API y al frontend si no.
+# La API protegida exige JWT; el webhook valida la firma de Kick; el callback exige un `state`
+# emitido por el backend; el socket exige token de admin o de overlay.
+redir /kick-tts /kick-tts/ 308
+
+handle /kick-tts/* {
+	@api path /kick-tts/health /kick-tts/kick/* /kick-tts/auth/* /kick-tts/voices /kick-tts/voices/* /kick-tts/settings /kick-tts/settings/* /kick-tts/chat/* /kick-tts/alerts/* /kick-tts/goals/* /kick-tts/overlays/* /kick-tts/spotify/* /kick-tts/points/* /kick-tts/remote/* /kick-tts/socket.io/*
+	handle @api {
+		uri strip_prefix /kick-tts
+		reverse_proxy kick-tts-backend:3000
+	}
+	handle {
+		uri strip_prefix /kick-tts
+		reverse_proxy kick-tts-frontend:80
+	}
+}

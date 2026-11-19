@@ -1,0 +1,75 @@
+name: kick-tts
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: kick-tts-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kick_tts
+      POSTGRES_USER: kicktts
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kicktts -d kick_tts"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 256m
+    networks: [internal]
+
+  backend:
+    build: ./backend
+    container_name: kick-tts-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      FRONTEND_URL: ${FRONTEND_URL}
+      ALERTS_DIR: /data/alerts
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      OVERLAY_TOKEN: ${OVERLAY_TOKEN}
+      DATABASE_URL: postgresql://kicktts:${DB_PASSWORD}@postgres:5432/kick_tts?schema=public
+      KICK_CLIENT_ID: ${KICK_CLIENT_ID:-}
+      KICK_CLIENT_SECRET: ${KICK_CLIENT_SECRET:-}
+      KICK_REDIRECT_URI: ${KICK_REDIRECT_URI}
+      KICK_EXTRA_SCOPES: ${KICK_EXTRA_SCOPES:-}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-}
+      FISH_API_KEY: ${FISH_API_KEY}
+      FISH_MODEL: ${FISH_MODEL:-s2.1-pro}
+      TTS_READ_MODE: ${TTS_READ_MODE:-all}
+      TTS_COMMAND: ${TTS_COMMAND:-!tts}
+      TTS_MAX_CHARS: ${TTS_MAX_CHARS:-100}
+      TTS_USER_COOLDOWN_SECONDS: ${TTS_USER_COOLDOWN_SECONDS:-10}
+      TTS_DAILY_CHAR_CAP: ${TTS_DAILY_CHAR_CAP:-50000}
+      TTS_BLOCKED_WORDS: ${TTS_BLOCKED_WORDS:-}
+    volumes:
+      - alerts-data:/data/alerts
+    # Solo loopback: para administrar por túnel SSH (ssh -L 3100:localhost:3100).
+    ports:
+      - "127.0.0.1:3100:3000"
+    mem_limit: 384m
+    networks: [internal, proxy]
+
+  frontend:
+    build: ./frontend
+    container_name: kick-tts-frontend
+    restart: unless-stopped
+    mem_limit: 32m
+    networks: [proxy]
+
+volumes:
+  pg-data:
+  alerts-data:
+
+networks:
+  internal:
+  proxy:
+    external: true
+    name: proxy
