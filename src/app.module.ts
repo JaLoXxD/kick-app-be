@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
+import { GatewayModule } from './gateway/gateway.module';
 import { GoalsModule } from './goals/goals.module';
 import { OverlaysModule } from './overlays/overlays.module';
 import { KickModule } from './kick/kick.module';
@@ -37,6 +38,7 @@ import { VoiceModule } from './voice/voice.module';
     PointsModule,
     VoiceModule,
     ChatModule,
+    GatewayModule,
   ],
   controllers: [AppController],
 })
